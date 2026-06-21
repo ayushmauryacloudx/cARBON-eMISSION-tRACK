@@ -3,8 +3,13 @@
  * Consolidates the carbon calculations using standard emission factors.
  * Works as a UMD module for both browser and Node.js testing.
  */
+"use strict";
+
 const CarbonCalculator = {
-  // Standard emission factors
+  /**
+   * Standard emission factors used for calculation.
+   * @type {Object}
+   */
   factors: {
     transport: {
       car: 0.21,      // kg CO2 per km
@@ -40,73 +45,121 @@ const CarbonCalculator = {
   },
 
   /**
+   * Safe value parsing to guarantee numeric outcomes and prevent NaN or negative anomalies.
+   * @param {*} val 
+   * @param {number} fallback 
+   * @returns {number}
+   */
+  _safeNum(val, fallback = 0) {
+    const parsed = Number(val);
+    if (isNaN(parsed) || parsed < 0) {
+      return fallback;
+    }
+    return parsed;
+  },
+
+  /**
    * Calculates the annual carbon footprint in tonnes of CO2 (tCO2/yr)
    * @param {Object} inputs 
    * @returns {number} Rounded to 1 decimal place
    */
   calculateScore(inputs) {
-    const { mode, km, kwh, gas, diet, shop, flights, waste } = inputs;
+    if (!inputs || typeof inputs !== 'object') {
+      return 0.0;
+    }
 
-    // Transport: daily km -> annual km * factor -> tonnes
-    const modeFactor = this.factors.transport[mode] !== undefined ? this.factors.transport[mode] : this.factors.transport.car;
-    const transportVal = (Number(km || 0) * 365 * modeFactor) / 1000;
+    try {
+      const mode = inputs.mode;
+      const km = this._safeNum(inputs.km, 20);
+      const kwh = this._safeNum(inputs.kwh, 250);
+      const gas = inputs.gas;
+      const diet = inputs.diet;
+      const shop = inputs.shop;
+      const flights = inputs.flights;
+      const waste = inputs.waste;
 
-    // Home Energy: monthly kWh -> annual kWh * factor -> tonnes
-    const energyVal = (Number(kwh || 0) * 12 * this.factors.electricity) / 1000;
+      // Transport: daily km -> annual km * factor -> tonnes
+      const modeFactor = this.factors.transport[mode] !== undefined ? this.factors.transport[mode] : this.factors.transport.car;
+      const transportVal = (km * 365 * modeFactor) / 1000;
 
-    // Gas Additions
-    const gasVal = this.factors.gas[gas] !== undefined ? this.factors.gas[gas] : this.factors.gas.med;
+      // Home Energy: monthly kWh -> annual kWh * factor -> tonnes
+      const energyVal = (kwh * 12 * this.factors.electricity) / 1000;
 
-    // Diet Additions
-    const dietVal = this.factors.diet[diet] !== undefined ? this.factors.diet[diet] : this.factors.diet.mixed;
+      // Gas Additions
+      const gasVal = this.factors.gas[gas] !== undefined ? this.factors.gas[gas] : this.factors.gas.med;
 
-    // Shopping Additions
-    const shopVal = this.factors.shop[shop] !== undefined ? this.factors.shop[shop] : this.factors.shop.occasional;
+      // Diet Additions
+      const dietVal = this.factors.diet[diet] !== undefined ? this.factors.diet[diet] : this.factors.diet.mixed;
 
-    // Flights Additions
-    const flightsVal = this.factors.flights[flights] !== undefined ? this.factors.flights[flights] : this.factors.flights.none;
+      // Shopping Additions
+      const shopVal = this.factors.shop[shop] !== undefined ? this.factors.shop[shop] : this.factors.shop.occasional;
 
-    // Waste/Recycling Additions
-    const wasteVal = this.factors.waste[waste] !== undefined ? this.factors.waste[waste] : this.factors.waste.partial;
+      // Flights Additions
+      const flightsVal = this.factors.flights[flights] !== undefined ? this.factors.flights[flights] : this.factors.flights.none;
 
-    const total = transportVal + energyVal + gasVal + dietVal + shopVal + flightsVal + wasteVal;
-    return parseFloat(total.toFixed(1));
+      // Waste/Recycling Additions
+      const wasteVal = this.factors.waste[waste] !== undefined ? this.factors.waste[waste] : this.factors.waste.partial;
+
+      const total = transportVal + energyVal + gasVal + dietVal + shopVal + flightsVal + wasteVal;
+      return parseFloat(total.toFixed(1));
+    } catch (e) {
+      return 0.0;
+    }
   },
 
   /**
    * Calculates the breakdown of emission sources in tonnes of CO2 (tCO2/yr)
-   * Useful for visual charts.
+   * @param {Object} inputs 
+   * @returns {Object}
    */
   calculateBreakdown(inputs) {
-    const { mode, km, kwh, gas, diet, shop, flights, waste } = inputs;
+    if (!inputs || typeof inputs !== 'object') {
+      return { transport: 0, energy: 0, food: 0, shopping: 0 };
+    }
 
-    const modeFactor = this.factors.transport[mode] !== undefined ? this.factors.transport[mode] : this.factors.transport.car;
-    const transport = parseFloat(((Number(km || 0) * 365 * modeFactor) / 1000).toFixed(2));
+    try {
+      const mode = inputs.mode;
+      const km = this._safeNum(inputs.km, 20);
+      const kwh = this._safeNum(inputs.kwh, 250);
+      const gas = inputs.gas;
+      const diet = inputs.diet;
+      const shop = inputs.shop;
+      const flights = inputs.flights;
+      const waste = inputs.waste;
 
-    const electricityVal = (Number(kwh || 0) * 12 * this.factors.electricity) / 1000;
-    const gasVal = this.factors.gas[gas] !== undefined ? this.factors.gas[gas] : this.factors.gas.med;
-    const energy = parseFloat((electricityVal + gasVal).toFixed(2));
+      const modeFactor = this.factors.transport[mode] !== undefined ? this.factors.transport[mode] : this.factors.transport.car;
+      const transport = parseFloat(((km * 365 * modeFactor) / 1000).toFixed(2));
 
-    const food = this.factors.diet[diet] !== undefined ? this.factors.diet[diet] : this.factors.diet.mixed;
-    
-    const shoppingVal = this.factors.shop[shop] !== undefined ? this.factors.shop[shop] : this.factors.shop.occasional;
-    const flightsVal = this.factors.flights[flights] !== undefined ? this.factors.flights[flights] : this.factors.flights.none;
-    const wasteVal = this.factors.waste[waste] !== undefined ? this.factors.waste[waste] : this.factors.waste.partial;
-    const shopping = parseFloat((shoppingVal + flightsVal + wasteVal).toFixed(2));
+      const electricityVal = (kwh * 12 * this.factors.electricity) / 1000;
+      const gasVal = this.factors.gas[gas] !== undefined ? this.factors.gas[gas] : this.factors.gas.med;
+      const energy = parseFloat((electricityVal + gasVal).toFixed(2));
 
-    return { transport, energy, food, shopping };
+      const food = this.factors.diet[diet] !== undefined ? this.factors.diet[diet] : this.factors.diet.mixed;
+      
+      const shoppingVal = this.factors.shop[shop] !== undefined ? this.factors.shop[shop] : this.factors.shop.occasional;
+      const flightsVal = this.factors.flights[flights] !== undefined ? this.factors.flights[flights] : this.factors.flights.none;
+      const wasteVal = this.factors.waste[waste] !== undefined ? this.factors.waste[waste] : this.factors.waste.partial;
+      const shopping = parseFloat((shoppingVal + flightsVal + wasteVal).toFixed(2));
+
+      return { transport, energy, food, shopping };
+    } catch (e) {
+      return { transport: 0, energy: 0, food: 0, shopping: 0 };
+    }
   },
 
   /**
    * Returns a letter grade based on annual carbon score
+   * @param {number} score 
+   * @returns {string}
    */
   getGrade(score) {
-    if (score < 3.0) return 'A+';
-    if (score < 4.5) return 'A';
-    if (score < 6.0) return 'B+';
-    if (score < 8.0) return 'B';
-    if (score < 10.0) return 'C+';
-    if (score < 13.0) return 'C';
+    const cleanScore = this._safeNum(score, 0);
+    if (cleanScore < 3.0) return 'A+';
+    if (cleanScore < 4.5) return 'A';
+    if (cleanScore < 6.0) return 'B+';
+    if (cleanScore < 8.0) return 'B';
+    if (cleanScore < 10.0) return 'C+';
+    if (cleanScore < 13.0) return 'C';
     return 'D';
   }
 };

@@ -117,6 +117,71 @@
     .no-border { border-bottom: none !important; }
     .gap-12 { gap: 12px; }
 
+    /* FLEX HEADER */
+    .flex-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .goal-selector-wrap select {
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13.5px;
+      font-family: var(--sans);
+      cursor: pointer;
+      transition: border-color var(--transition-fast);
+    }
+    .goal-selector-wrap select:focus {
+      border-color: var(--accent2);
+      outline: none;
+    }
+
+    /* GOAL PROGRESS INDICATOR */
+    .goal-progress-container {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .goal-progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+      margin-bottom: 8px;
+    }
+    .goal-status-inactive {
+      color: var(--text-dim);
+    }
+    .goal-status-active {
+      color: var(--accent);
+      font-weight: bold;
+    }
+    .goal-status-reached {
+      color: var(--accent2);
+      font-weight: bold;
+      animation: pulse 1.5s infinite alternate;
+    }
+    .goal-progress-bar-bg {
+      background: var(--bg2);
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      width: 100%;
+    }
+    .goal-progress-bar-fill {
+      background: var(--accent2);
+      height: 100%;
+      width: 0%;
+      border-radius: 4px;
+      transition: width var(--transition-standard) ease;
+      box-shadow: 0 0 8px rgba(93, 202, 165, 0.4);
+    }
+
     /* NAVIGATION */
     nav {
       position: sticky;
@@ -733,6 +798,11 @@
       gap: 10px;
     }
 
+    @keyframes pulse {
+      from { transform: scale(1); opacity: 0.9; }
+      to { transform: scale(1.02); opacity: 1; }
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -1040,8 +1110,31 @@
     </div>
 
     <div class="card">
-      <h3 class="card-title">My Carbon Reduction Plan</h3>
+      <div class="flex-header mb-14">
+        <h3 class="card-title">My Carbon Reduction Plan</h3>
+        <div class="goal-selector-wrap">
+          <label for="reductionGoal" class="sr-only">Set Reduction Goal</label>
+          <select id="reductionGoal" onchange="updateGoalProgress()" aria-label="Target Reduction Goal">
+            <option value="0">Set a reduction goal...</option>
+            <option value="10">Target: 10% Reduction</option>
+            <option value="20">Target: 20% Reduction</option>
+            <option value="30">Target: 30% Reduction</option>
+          </select>
+        </div>
+      </div>
       <p class="card-subtitle">Check actions to apply them to your score and track your real-time savings.</p>
+      
+      <!-- Goal Progress Indicator -->
+      <div id="goalProgressWrapper" class="goal-progress-container sr-only mb-24">
+        <div class="goal-progress-header">
+          <span>Goal Progress: <strong id="progressPctText">0%</strong> completed</span>
+          <span id="goalStatusText" class="goal-status-inactive">Inactive</span>
+        </div>
+        <div class="goal-progress-bar-bg">
+          <div id="goalProgressBar" class="goal-progress-bar-fill"></div>
+        </div>
+      </div>
+
       <div class="grid g3">
         <label class="action-card" for="act-carpool">
           <input type="checkbox" id="act-carpool" class="action-checkbox" data-savings="0.18" onchange="toggleAction()">
@@ -1435,6 +1528,49 @@
         }
       });
     }
+
+    // Recalculate reduction progress bar if set
+    updateGoalProgress(finalScore);
+  }
+
+  // Goal Progress tracker calculations
+  function updateGoalProgress(currentScoreOverride) {
+    const inputs = getInputs();
+    const breakdown = CarbonCalculator.calculateBreakdown(inputs);
+    const baseScore = breakdown.transport + breakdown.energy + breakdown.food + breakdown.shopping;
+
+    const targetPct = parseFloat(document.getElementById('reductionGoal').value);
+    const progressWrapper = document.getElementById('goalProgressWrapper');
+    const statusText = document.getElementById('goalStatusText');
+    const progressBar = document.getElementById('goalProgressBar');
+    const pctText = document.getElementById('progressPctText');
+
+    if (targetPct === 0) {
+      progressWrapper.classList.add('sr-only');
+      return;
+    }
+
+    progressWrapper.classList.remove('sr-only');
+
+    // Total savings checked off
+    let savings = 0;
+    if (document.getElementById('act-carpool')?.checked) savings += 0.18;
+    if (document.getElementById('act-led')?.checked) savings += 0.05;
+    if (document.getElementById('act-meat')?.checked) savings += 0.12;
+
+    const targetSavings = baseScore * (targetPct / 100);
+    const progress = targetSavings > 0 ? Math.min(100, Math.round((savings / targetSavings) * 100)) : 100;
+
+    progressBar.style.width = `${progress}%`;
+    pctText.textContent = `${progress}%`;
+
+    if (progress >= 100) {
+      statusText.textContent = '🎉 Goal Reached!';
+      statusText.className = 'goal-status-reached';
+    } else {
+      statusText.textContent = 'Active';
+      statusText.className = 'goal-status-active';
+    }
   }
 
   // AI Sustainability Coach
@@ -1490,6 +1626,19 @@
     if (storedScore) {
       document.getElementById('heroScoreOut').textContent = parseFloat(storedScore).toFixed(1);
     }
+
+    // Bind change listeners to all calculator inputs so it updates live in the background!
+    document.querySelectorAll('.step input, .step select').forEach(input => {
+      input.addEventListener('change', () => {
+        calculateScore();
+      });
+      // Also listen to input events for sliders so it's instantaneous!
+      if (input.type === 'range') {
+        input.addEventListener('input', () => {
+          calculateScore();
+        });
+      }
+    });
   });
 
   // Diagnostics Self-Tester (Grader validation check)
@@ -1513,7 +1662,7 @@
       assert("Score 2.5 is A+", CarbonCalculator.getGrade(2.5) === 'A+');
       assert("Score 15.0 is D", CarbonCalculator.getGrade(15.0) === 'D');
       
-      console.log(`%cDiagnostic Complete: ${passes} passed, ${fails} failed.`, "font-weight: bold; color: #5DCAA5;");
+      console.log(`%cDiagnostic Complete: ${passes} passed, ${fails} failed.`, "font-weight: color: #5DCAA5;");
     } catch (err) {
       console.error("Diagnostic suite crashed:", err);
     }
