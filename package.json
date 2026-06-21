@@ -1,0 +1,14 @@
+{
+  "name": "ecotrack-ai",
+  "version": "1.0.0",
+  "description": "Personal Carbon Footprint Tracker",
+  "main": "calculator-logic.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node -e \"console.log('Project is static HTML. Run locally with docker or check ecotrack-ai.html')\""
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
